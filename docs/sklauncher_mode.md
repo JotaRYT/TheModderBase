@@ -1,193 +1,136 @@
-# SKLAUNCHER - Minecraft Optimization Script Documentation
+# SKLauncher Mode - Performance Optimization Script
 
-## Introduction
+## Overview
 
-The **Minecraft Optimization Script** is designed to improve the performance of macOS systems when running the SKLauncher for Minecraft. The script optimizes the system by killing unnecessary background processes, clearing system caches, and adjusting Java Virtual Machine (JVM) settings for better performance. It ensures that Minecraft runs smoothly with higher frame rates, reduced lag, and optimal use of system resources.
+The SKLauncher Mode script provides system optimization for running Minecraft on macOS through SKLauncher. It automatically adjusts settings, clears caches, and generates optimal configurations based on your hardware specifications.
 
-This script is temporary and should be used when preparing to play Minecraft. You can run it every time you want to optimize your system for better gameplay, but frequent use may not be necessary.
+## Compatibility
 
-## Disclaimer
+- **Operating System**: macOS 15.x
+- **Architecture**: Intel (x86_64) and Apple Silicon (arm64)
+- **Required Software**:
+  - SKLauncher (version 3.2.10)
+  - Java/JDK (Latest LTS recommended and JDK over Java)
 
-> **Warning**:  
-> I do not take responsibility for any software or hardware problems that may arise from using this or other scripts. Use it at your own risk. By using this or any related shell scripts, you acknowledge that you are accepting full responsibility for your hardware and software, including any potential issues that may result. Proceed with caution and ensure you understand the changes being made to your system. I made those scripts with love and I tested myself but I only tested in MacOs 15.x versions, not older/newer.
+## Features
 
-## Purpose
+- Automatic hardware detection and optimization
+- Smart background process management
+- Dynamic JVM arguments generation
+- Recommended video settings based on GPU
+- System cache cleanup
+- Temporary performance tweaks
 
-The goal of this script is to optimize system performance specifically for running SKLauncher and Minecraft by reducing background tasks, clearing caches, and adjusting system and JVM settings. The script performs the following tasks:
+## Usage
 
-1. Terminates unnecessary background processes to free up system resources.
-2. Clears system and DNS caches to improve performance.
-3. Adjusts memory and system settings to handle Minecraft more efficiently.
-4. Allocates more resources to Java for improved Minecraft performance.
-5. Launches SKLauncher and runs Minecraft with optimal settings.
-
-## Prerequisites
-
-- **macOS**: The script is designed for macOS 15.x and later.
-- **SKLauncher**: SKLauncher must be installed and accessible on your system.
-- **JDK/Java Desktop**: Required to run SKLauncher & Minecraft.
-- **Administrator Privileges**: You need sudo privileges to run the script.
-
-## Script Breakdown
-
-### 1. **Message Initialization**
+### Basic Usage
 
 ```bash
-echo "Performance optimizations are being applied to run SKLauncher..."
+sudo ./sklauncher_mode.sh
 ```
 
-This prints a message to inform the user that performance optimizations are being applied.
-
-### 2. **Stop Unnecessary Background Processes**
+### Advanced Options
 
 ```bash
-pkill "Activity Monitor"
-pkill "Photos"
-pkill "iTunes"
-pkill "Music"
-pkill "System Settings"
-pkill "Calendar"
-pkill "Reminders"
-pkill "Notes"
-pkill "Maps"
-pkill "Contacts"
-pkill "Messages"
-pkill "FaceTime"
-pkill "App Store"
-pkill "Xcode"
-pkill "Visual Studio Code"
-pkill "Github Desktop"
-pkill "Slack"
-pkill "SF Symbols"
-pkill "Mail"
-pkill "Roblox"
+sudo ./sklauncher_mode.sh [options]
+
+Options:
+  --skip-jvm       Skip JVM arguments generation
+  --skip-settings  Skip video settings recommendations
 ```
 
-These commands terminate applications that are running in the background and not necessary for running Minecraft. Closing apps like Photos, Slack, iTunes, and others frees up CPU and RAM for the game.
+## Hardware-Specific Optimizations
 
-### 3. **Clear System Caches**
+### Apple Silicon (M-series)
 
-```bash
-sudo purge                      # Clear system memory cache (RAM)
-sudo update_dyld_shared_cache   # Clear system cache
-```
+- M1: Balanced settings for efficiency and performance
+- M2: Enhanced graphics and render distance
+- M3/M4: Maximum quality settings with extended view distance
 
-- **`sudo purge`**: Clears the system's memory cache to free up resources for Minecraft.
-- **`sudo update_dyld_shared_cache`**: Clears the dynamic library cache, ensuring macOS is using the most up-to-date libraries.
+### Intel-based Macs
 
-### 4. **Adjust Memory and System Settings**
+- Integrated Graphics: Conservative settings for stability
+- Discrete GPU: Enhanced settings based on available RAM
 
-```bash
-sudo sysctl kern.memorystatus_purge_on_urgent=1       # Purge memory on urgent (under memory pressure)
-sudo dscacheutil -flushcache                          # Clear DNS cache
-sudo killall -HUP mDNSResponder                       # Restart DNS service
-```
+## Generated Configurations
 
-- **`kern.memorystatus_purge_on_urgent=1`**: Forces the system to purge memory aggressively under pressure, improving responsiveness.
-- **`dscacheutil -flushcache`**: Clears the DNS cache to avoid any potential network issues.
-- **`killall -HUP mDNSResponder`**: Restarts the mDNSResponder service for fresh network resolution.
+### JVM Arguments
 
-### 5. **Allocate Resources to Java**
+- Dynamically allocated based on system RAM
+- Optimized garbage collection settings
+- Hardware-specific threading configurations
 
-```bash
--XX:+UnlockExperimentalVMOptions
--XX:+AlwaysPreTouch
--Xms2G -Xmx8G
--XX:+UseG1GC
--XX:MaxGCPauseMillis=50
--XX:+UseParallelGC
--XX:ParallelGCThreads=4
--XX:+AggressiveOpts
--Dsun.java2d.opengl=true
--Xss256k
--XX:+UseConcMarkSweepGC
-```
+### Video Settings
 
-These are JVM flags that optimize the performance of Minecraft by managing memory and garbage collection more efficiently. They ensure the game uses more memory and runs with smoother graphics.
+- GPU-aware graphics presets
+- Balanced performance vs. quality options
+- RAM-dependent render distance adjustments
 
-### 6. **Launch SKLauncher**
+## Background Process Management
 
-```bash
-find_SKlauncher() {
-    local SKlauncher_path
-    SKlauncher_path=$(find /Applications ~/Downloads -maxdepth 1 -iname "SKlauncher-*.jar" | head -n 1)
-    
-    if [ -n "$SKlauncher_path" ]; then
-        echo "$SKlauncher_path"
-    else
-        echo ""
-    fi
-}
+The script manages these application categories:
 
-SKlauncher=$(find_SKlauncher)
+- System utilities (Activity Monitor, System Settings)
+- Media apps (Photos, Music, TV)
+- Communication apps (Messages, FaceTime)
+- Development tools (Xcode, VS Code)
+- Office applications
+- Gaming platforms
 
-if [ -n "$SKlauncher" ]; then
-    echo "Launching SKLauncher from: $SKlauncher"
-    java -jar "$SKlauncher"
-else
-    echo "SKLauncher not found in Applications or Downloads. Please ensure it is installed."
-    exit 1
-fi
-```
+## Safety Features
 
-This section searches for SKLauncher on your system (either in `/Applications` or `~/Downloads`) and launches it using Java. If SKLauncher is not found, an error message is displayed.
+- Automatic SKLauncher detection
+- Error handling for missing components
+- Safe process termination
+- Temporary system modifications
+- No permanent changes to system configuration
 
-### 7. **Final Message**
+## Troubleshooting
 
-```bash
-echo "Performance optimizations applied to run Minecraft using SKLauncher.."
-```
+### Common Issues
 
-This message informs the user that the optimizations have been applied and SKLauncher is ready to run.
+1. **SKLauncher Not Found**
+   - Ensure SKLauncher-3.2.10.jar is in a supported location
+   - Supported paths: Downloads, Desktop, Applications
 
-## Usage Instructions
+2. **Permission Errors**
+   - Run with sudo
+   - Verify file permissions
 
-To use the **Minecraft Optimization Script**, follow these steps:
+3. **Performance Issues**
+   - Check generated settings match your hardware
+   - Monitor system resources
+   - Consider using --skip-settings for manual configuration
+   - Don't blame an experimental feature, generation of JVM Arguments & Minecraft settings is just experimental and might be correct/incorrect.
 
-1. Download the script file `minecraft_mode.sh`.
-2. Open Terminal and navigate to the directory where the script is saved.
-3. Make the script executable:
+## Best Practices
 
-   ```bash
-   chmod +x minecraft_mode.sh
-   ```
+1. Keep macOS and Java/JDK updated
+2. Open issues with JVM & Minecraft settings generation if found any.
 
-4. Run the script:
+## Additional Notes
 
-   ```bash
-   sudo ./minecraft_mode.sh
-   ```
+- Video settings are recommendations only
+- JVM arguments require manual application in SKLauncher, you can do this in profile->edit installation->advanced options/settings-> Arguments(the end of the page)
+- The script prioritizes stability over maximum performance so it might give you 120 stable FPS or 60 locked FPS.
 
-Once the script has finished, SKLauncher will be launched with optimized settings for Minecraft, ensuring better performance during gameplay.
+## Technical Details
 
-## Reverting Changes
+The script performs these operations:
 
-To revert any changes made by the script:
+1. **System Analysis**
+   - CPU architecture detection
+   - RAM availability check
+   - GPU identification
+   - Core count determination
 
-- **Re-enable system features** (like hibernation):
+2. **Resource Management**
+   - Memory cache clearing
+   - Dynamic library cache updates
+   - DNS cache management
+   - Process priority adjustment
 
-  ```bash
-  sudo pmset -a hibernatemode 3  # Re-enable hibernation (default setting)
-  ```
-
-Yes, it's just that, JVM arguments stop when you quit an java app.
-
-## Possible Issue: JVM Arguments Not Working in SKLauncher
-
-If you're experiencing issues where the JVM arguments are not being applied while/before running in SKLauncher, you can resolve this by manually adding the arguments to the installation settings. Here's how to fix it:
-
-1. Copy the JVM Arguments: Copy all the required JVM arguments you want to use.
-2. Locate the Installation Settings: Go to your installation in SKLauncher and open its settings.
-3. Add the Arguments: In the configuration settings, paste the JVM arguments. Make sure to:
-   - Place the arguments after any existing ones.
-   - Ensure there is a space between the newly added arguments and any that were already there.
-   - Check for any duplicate arguments to avoid conflicts.
-4. Alternative Solution: If the issue persists, try adding the JVM arguments after launching SKLauncher. This can resolve the issue.
-
-By following these steps, you should be able to apply the JVM arguments successfully.
-
-## Conclusion
-
-The **Minecraft Optimization Script** is an effective way to optimize your macOS system for better Minecraft performance. By disabling unnecessary processes, freeing up system resources, and tweaking JVM settings, this script provides a smooth and lag-free gaming experience. If you have any concerns, you can look up each command used in the script for more details.
-
-For further information, consult Apple's official documentation on system utilities like `sysctl`, `dscacheutil`, and `pmset`.
+3. **Configuration Generation**
+   - Hardware-specific JVM arguments
+   - Optimized video settings
+   - Memory allocation calculations
