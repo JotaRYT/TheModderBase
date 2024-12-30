@@ -1,108 +1,119 @@
-# This script applies performance optimizations specifically to roblox
-# Sudo is required to run this script.
+#!/bin/bash
 
+# Exit immediately if a command exits with a non-zero status,
+# if an undefined variable is used, or if a pipe command fails
+set -euo pipefail
 
-
-# -------------------------------
-# Introduction
-# -------------------------------
-
-# Print message to console letting user know that performance optimizations are being applied
-echo "Performance optimizations are being applied to run SKLauncher..."
-
-
-
-# -------------------------------
-# Stop unnecessary background processes
-# -------------------------------
-
-# Kill various background processes that may consume resources unnecessarily
-# These apps will be terminated to free up system resources.
-pkill "Activity Monitor"                                                    # Activity Monitor - system monitoring tool
-pkill "Photos"                                                              # Photos app - consuming resources with media library
-pkill "iTunes"                                                              # iTunes - legacy app, replaced by Music on newer macOS versions
-pkill "Music"                                                               # Music app - could be running in the background
-pkill "System Settings"                                                     # System Settings - not needed while gaming
-pkill "Calendar"                                                            # Calendar app - unnecessary in a gaming context
-pkill "Reminders"                                                           # Reminders app - background task
-pkill "Notes"                                                               # Notes app - may use resources for syncing
-pkill "Maps"                                                                # Maps app - consumes resources even when not in use
-pkill "Contacts"                                                            # Contacts app - syncing in the background
-pkill "Messages"                                                            # Messages app - consumes CPU for notifications
-pkill "FaceTime"                                                            # FaceTime app - will impact performance
-pkill "App Store"                                                           # App Store - unnecessary during gameplay
-pkill "Xcode"                                                               # Xcode - developer tool, not needed during gaming
-pkill "Visual Studio Code"                                                  # Visual Studio Code - developer tool
-pkill "Github Desktop"                                                      # GitHub Desktop - unnecessary in gaming mode
-pkill "Slack"                                                               # Slack - messaging app that may use CPU
-pkill "SF Symbols"                                                          # SF Symbols - design tool running in the background
-pkill "Mail"                                                                # Mail app - unnecessary background activity
-pkill "Java"                                                                # Java - unnecessary if you wanna play Roblox
-
-
-
-# -------------------------------
-# Clear system caches
-# -------------------------------
-
-# Clear system memory cache to free up RAM (may improve performance)
-sudo purge                                                                  # This clears system memory cache (RAM) - Safe to use, but can slow things down temporarily.
-
-# Clear system shared dynamic libraries cache (rebuilds on next boot)
-sudo update_dyld_shared_cache                                               # Clears the dynamic library cache - Safe to use
-
-
-
-# -------------------------------
-# Adjust memory and system settings
-# -------------------------------
-
-# Enable fast memory compression for more efficient memory use (improves performance under memory pressure)
-sudo sysctl vm.compressor_mode=4                                            # Safe, adjusts the memory compression mode to a faster one
-
-# Aggressively purge memory when under heavy memory pressure
-sudo sysctl kern.memorystatus_purge_on_urgent=1                             # Safe, this forces memory purging when under memory pressure
-
-# Clear DNS cache to avoid any potential network resolution issues
-sudo dscacheutil -flushcache                                                # Safe, clears DNS cache
-
-# Restart the DNS service to refresh DNS settings
-sudo killall -HUP mDNSResponder                                             # Safe, restarts mDNSResponder for network name resolution
-
-
-
-# -------------------------------
-# Launch Roblox
-# -------------------------------
-
-# Open Roblox (will launch the Roblox app)
-open -a Roblox  # Safe, launches the Roblox application
-
-
-
-# -------------------------------
-# Disable hibernation (optional for performance)
-# -------------------------------
-
-# Disables hibernation to prevent the system from writing memory to disk (saves time during startup)
-sudo pmset -a hibernatemode 0                                               # Safe, but disables sleep to disk, so you’ll lose the ability to resume from hibernation.
-
-
-
-# -------------------------------
-# Set Roblox process priority (if running)
-# -------------------------------
-
-# Increase the priority of the Roblox process to allocate more CPU resources to it
-if pgrep RobloxPlayer > /dev/null; then
-    renice -n -10 -p $(pgrep RobloxPlayer)                                  # Safe, sets the priority of the Roblox process to a higher level
+# Ensure the script is run as root
+if [[ $EUID -ne 0 ]]; then
+    echo "Error: This script must be run as root/sudo" >&2
+    exit 1
 fi
 
+# -----------------------------
+# Configuration
+# -----------------------------
 
+readonly BACKGROUND_APPS=(
+    "Activity Monitor" "Photos" "iTunes" "System Settings" "Calendar"
+    "Reminders" "Notes" "Maps" "Contacts" "Messages" "FaceTime"
+    "App Store" "Xcode" "Visual Studio Code" "Github Desktop" "Slack"
+    "SF Symbols" "Mail" "Java" "Roblox" "Home" "Finder"
+    "Automator" "Books" "Calculator" "Chess" "Clock" "Dictionary"
+    "Epic Games Launcher" "Find My" "Font Book" "Freeform"
+    "Image Capture" "Image Playground" "iPhone Mirroring" "Mactracker"
+    "Microsoft Excel" "Microsoft OneNote" "Microsoft Outlook"
+    "Microsoft PowerPoint" "Microsoft Word" "Mythic" "News"
+    "OneDrive" "Passwords" "Podcasts" "Photo Booth" "Preview"
+    "QuickTime Player" "Shortcuts" "Stickies" "Stocks" "TextEdit"
+    "The Unarchiver" "TV" "Tips" "Time Machine"
+    "Unzip - RAR ZIP 7Z Unarchiver" "Voice Memos" "Weather"
+    "Siri" "Mission Control"
+)
+# Add other apps you don’t use while playing to the list above
 
-# -------------------------------
-# Final message
-# -------------------------------
+# -----------------------------
+# Helper Functions
+# -----------------------------
 
-# Print message to console letting user know that performance optimizations have been applied
-echo "Performance optimizations applied to run Roblox."
+# Helper function to log messages with timestamps
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+# clean up background processes
+cleanup_background_processes() {
+    log "Stopping background processes..."
+    for app in "${BACKGROUND_APPS[@]}"; do
+        if pgrep "$app" >/dev/null 2>&1; then
+            pkill "$app" >/dev/null 2>&1 || log "Warning: Failed to stop $app"
+        fi
+    done
+}
+
+# Clear system caches
+clear_system_caches() {
+    log "Clearing system caches..."
+    # Clear system memory cache
+    purge || log "Warning: Failed to clear memory cache"
+    
+    # Clear dynamic library cache
+    update_dyld_shared_cache || log "Warning: Failed to update dyld shared cache"
+    
+    # Clear DNS cache and restart service
+    dscacheutil -flushcache
+    killall -HUP mDNSResponder >/dev/null 2>&1 || log "Warning: Failed to restart DNS service"
+}
+
+# Optimize system settings
+optimize_system_settings() {
+    log "Optimizing system settings..."
+    
+    # Set memory purge settings
+    sysctl kern.memorystatus_purge_on_urgent=1 || log "Warning: Failed to set memory purge settings"
+    
+    # Disable hibernation
+    pmset -a hibernatemode 0 || log "Warning: Failed to disable hibernation"
+}
+
+# Optimize Roblox process priority
+optimize_roblox_process() {
+    log "Optimizing Roblox process priority..."
+    local roblox_pid
+    
+    if roblox_pid=$(pgrep RobloxPlayer 2>/dev/null); then
+        renice -n -10 -p "$roblox_pid" || log "Warning: Failed to adjust Roblox process priority"
+    else
+        log "Note: Roblox process not found, skipping priority adjustment"
+    fi
+}
+
+# Launch Roblox
+launch_roblox() {
+    log "Launching Roblox..."
+    if ! open -a Roblox; then
+        log "Error: Failed to launch Roblox"
+        return 1
+    fi
+}
+
+# -----------------------------
+# Main Execution
+# -----------------------------
+
+# Main function to execute all optimizations
+main() {
+    log "Starting Roblox performance optimization..."
+    
+    cleanup_background_processes                # Stop background processes
+    clear_system_caches                         # Clear system caches
+    optimize_system_settings                    # Optimize system settings
+    launch_roblox                               # Launch Roblox
+    optimize_roblox_process                     # Optimize Roblox process priority
+    
+    log "Performance optimizations completed successfully"
+    pkill Terminal >/dev/null 2>&1              # Close Terminal window
+}
+
+# Execute main function
+main "$@"
