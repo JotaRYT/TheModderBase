@@ -10,6 +10,8 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+
+
 # -----------------------------
 # Configuration
 # -----------------------------
@@ -31,6 +33,8 @@ readonly BACKGROUND_APPS=(
     "Siri" "Mission Control"
 )
 # Add other apps you don’t use while playing to the list above
+
+
 
 # -----------------------------
 # Helper Functions
@@ -96,6 +100,8 @@ launch_roblox() {
         return 1
     fi
 }
+
+
 
 # -----------------------------
 # Main Execution
