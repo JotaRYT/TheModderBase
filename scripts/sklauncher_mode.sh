@@ -1,149 +1,266 @@
-# This script applies performance optimizations specifically to SKLauncher (Minecraft Launcher)
-# Sudo is required to run this script.
+#!/bin/bash
 
+# Exit immediately if a command exits with a non-zero status,
+# if an undefined variable is used, or if a pipe command fails
+set -euo pipefail
 
-
-# -------------------------------
-# Introduction
-# -------------------------------
-
-# Print message to console letting user know that performance optimizations are being applied
-echo "Performance optimizations are being applied to run SKLauncher..."
-
-
-
-# -------------------------------
-# Stop unnecessary background processes
-# -------------------------------
-
-# Kill various background processes that may consume resources unnecessarily
-# These apps will be terminated to free up system resources.
-pkill "Activity Monitor"                                                    # Activity Monitor - system monitoring tool
-pkill "Photos"                                                              # Photos app - consuming resources with media library
-pkill "iTunes"                                                              # iTunes - legacy app, replaced by Music on newer macOS versions
-pkill "Music"                                                               # Music app - could be running in the background
-pkill "System Settings"                                                     # System Settings - not needed while gaming
-pkill "Calendar"                                                            # Calendar app - unnecessary in a gaming context
-pkill "Reminders"                                                           # Reminders app - background task
-pkill "Notes"                                                               # Notes app - may use resources for syncing
-pkill "Maps"                                                                # Maps app - consumes resources even when not in use
-pkill "Contacts"                                                            # Contacts app - syncing in the background
-pkill "Messages"                                                            # Messages app - consumes CPU for notifications
-pkill "FaceTime"                                                            # FaceTime app - will impact performance
-pkill "App Store"                                                           # App Store - unnecessary during gameplay
-pkill "Xcode"                                                               # Xcode - developer tool, not needed during gaming
-pkill "Visual Studio Code"                                                  # Visual Studio Code - developer tool
-pkill "Github Desktop"                                                      # GitHub Desktop - unnecessary in gaming mode
-pkill "Slack"                                                               # Slack - messaging app that may use CPU
-pkill "SF Symbols"                                                          # SF Symbols - design tool running in the background
-pkill "Mail"                                                                # Mail app - unnecessary background activity
-pkill "Roblox"                                                              # Roblox - unnecessary if you wanna play Minecraft
-
-
-
-# -------------------------------
-# Clear system caches
-# -------------------------------
-
-# Clear system memory cache to free up RAM (may improve performance)
-sudo purge                                                                  # This clears system memory cache (RAM) - Safe to use, but can slow things down temporarily.
-
-# Clear system shared dynamic libraries cache (rebuilds on next boot)
-sudo update_dyld_shared_cache                                               # Clears the dynamic library cache - Safe to use
-
-
-
-# -------------------------------
-# Adjust memory and system settings
-# -------------------------------
-
-# Reset VM-related Sysctl Parameters
-sudo sysctl vm.swapusage                                                    # Safe, displays swap usage
-sudo sysctl kern.maxvnodes                                                  # Safe, displays max vnodes
-
-# Aggressively purge memory when under heavy memory pressure
-sudo sysctl kern.memorystatus_purge_on_urgent=1                             # Safe, this forces memory purging when under memory pressure
-
-# Clear DNS cache to avoid any potential network resolution issues
-sudo dscacheutil -flushcache                                                # Safe, clears DNS cache
-
-# Restart the DNS service to refresh DNS settings
-sudo killall -HUP mDNSResponder                                             # Safe, restarts mDNSResponder for network name resolution
-
-
-
-# -------------------------------
-# Minecraft Tweaks
-# -------------------------------
-
--Dfml.readTimeout=60                                                        # Safe, sets the read timeout for Forge Mod Loader to 60 seconds
-
-
-
-# -------------------------------
-# Launch SKLauncher
-# -------------------------------
-
-# Function to find SKLauncher dynamically
-find_SKlauncher() {
-    # Search in /Applications and ~/Downloads for files matching "SKlauncher-*.jar"
-    local SKlauncher_path
-    SKlauncher_path=$(find /Applications ~/Downloads -maxdepth 1 -iname "SKlauncher-*.jar" | head -n 1)
-    
-    # Check if SKLauncher was found
-    if [ -n "$SKlauncher_path" ]; then
-        echo "$SKlauncher_path"
-    else
-        echo ""
-    fi
-}
-
-# Find SKLauncher
-SKlauncher=$(find_SKlauncher)
-
-# Check if SKLauncher was found
-if [ -n "$SKlauncher" ]; then
-    echo "Launching SKLauncher from: $SKlauncher"
-    # Use Java to run the JAR file
-    java -jar "$SKlauncher"
-else
-    echo "SKLauncher not found in Applications or Downloads. Please ensure it is installed."
+# Ensure the script is run as root
+if [[ $EUID -ne 0 ]]; then
+    echo "Error: This script must be run as root/sudo" >&2
     exit 1
 fi
 
 
 
-# -------------------------------
-# Alocate Resources to Java
-# -------------------------------
+# -----------------------------
+# Configuration
+# -----------------------------
 
--XX:+UnlockExperimentalVMOptions                                            # Safe, unlocks experimental VM options for Java
--XX:+AlwaysPreTouch                                                         # Safe, pre-touches memory to avoid lazy memory allocation(aggressive heap management)
--Xms2G -Xmx8G                                                               # Safe, allocates initial 2GB of memory to Java and allows it to use up to 8GB of memory(change this if you have more RAM)
--XX:+UseG1GC                                                                # Safe, enables the G1 garbage collector to optimize performance
--XX:MaxGCPauseMillis=50                                                     # Safe, sets the maximum pause time goal for garbage collection to 50 milliseconds
--XX:+UseParallelGC                                                          # Safe, enables parallel garbage collection to make better use of multi-core CPUs.
--XX:ParallelGCThreads=4                                                     # Safe, but can either improve performance or make it worse. Sets the number of threads used for parallel garbage collection(changing this if you have more cores)
--XX:+AggressiveOpts                                                         # Safe, enables aggressive optimizations for better performance
--Dsun.java2d.opengl=true                                                    # Safe, enables OpenGL acceleration for Java2D rendering(Good for minecraft)
--Xss256k                                                                    # Safe, sets the thread stack size to 256KB
--XX:+UseConcMarkSweepGC                                                     # Safe, enables the Concurrent Mark Sweep garbage collector
+readonly BACKGROUND_APPS=(
+    "Activity Monitor" "Photos" "iTunes" "System Settings" "Calendar"
+    "Reminders" "Notes" "Maps" "Contacts" "Messages" "FaceTime"
+    "App Store" "Xcode" "Visual Studio Code" "Github Desktop" "Slack"
+    "SF Symbols" "Mail" "Java" "Roblox" "Home" "Finder"
+    "Automator" "Books" "Calculator" "Chess" "Clock" "Dictionary"
+    "Epic Games Launcher" "Find My" "Font Book" "Freeform"
+    "Image Capture" "Image Playground" "iPhone Mirroring" "Mactracker"
+    "Microsoft Excel" "Microsoft OneNote" "Microsoft Outlook"
+    "Microsoft PowerPoint" "Microsoft Word" "Mythic" "News"
+    "OneDrive" "Passwords" "Podcasts" "Photo Booth" "Preview"
+    "QuickTime Player" "Shortcuts" "Stickies" "Stocks" "TextEdit"
+    "The Unarchiver" "TV" "Tips" "Time Machine"
+    "Unzip - RAR ZIP 7Z Unarchiver" "Voice Memos" "Weather"
+    "Siri" "Mission Control"
+)   # Add other apps you don’t use while playing to the list above
+
+SKIP_JVM_ARGS=false
+SKIP_SETTINGS=false
+
+# Get CPU architecture
+ARCH=$(uname -m)
+
+# Get number of CPU cores
+CORES=$(sysctl -n hw.ncpu)
+
+# Get GPU information
+GPU=$(system_profiler SPDisplaysDataType | grep "Chipset Model" | awk -F: '{print $2}' | sed 's/^ *//')
+
+# Get RAM size in GB
+RAM=$(sysctl -n hw.memsize)
+RAM=$((RAM / 1024 / 1024 / 1024))  # Convert bytes to GB
 
 
 
-# -------------------------------
-# JVM good Arguments
-# -------------------------------
+# -----------------------------
+# Helper Functions
+# -----------------------------
 
--XX:+DisableExplicitGC                                                      # Safe, disables explicit garbage collection calls
--Xshare:on                                                                  # Safe, enables class data sharing to reduce startup time
--XX:+UseStringDeduplication                                                 # Safe, enables string deduplication to reduce memory usage
+# Helper function to log messages with timestamps
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+# clean up background processes
+cleanup_background_processes() {
+    log "Stopping background processes..."
+    for app in "${BACKGROUND_APPS[@]}"; do
+        if pgrep "$app" >/dev/null 2>&1; then
+            pkill "$app" >/dev/null 2>&1 || log "Warning: Failed to stop $app"
+        fi
+    done
+}
+
+# Clear system caches
+clear_system_caches() {
+    log "Clearing system caches..."
+    # Clear system memory cache
+    purge || log "Warning: Failed to clear memory cache"
+    
+    # Clear dynamic library cache
+    update_dyld_shared_cache || log "Warning: Failed to update dyld shared cache"
+    
+    # Clear DNS cache and restart service
+    dscacheutil -flushcache
+    killall -HUP mDNSResponder >/dev/null 2>&1 || log "Warning: Failed to restart DNS service"
+}
+
+# Optimize system settings
+optimize_system_settings() {
+    log "Optimizing system settings..."
+    
+    # Set memory purge settings
+    sysctl kern.memorystatus_purge_on_urgent=1 || log "Warning: Failed to set memory purge settings"
+    
+    # Disable hibernation
+    pmset -a hibernatemode 0 || log "Warning: Failed to disable hibernation"
+}
+
+# Find and open SKLauncher location
+find_sklauncher() {
+    log "Searching for SKLauncher..."
+    
+    # Common locations to search
+    local search_locations=(
+        "$HOME/Downloads"
+        "$HOME/Desktop"
+        "$HOME/Applications"
+        "/Applications"
+        "$HOME"
+    )
+    
+    local sklauncher_path=""
+    
+    # Search for SKLauncher in common locations
+    for location in "${search_locations[@]}"; do
+        if [ -f "$location/SKlauncher-3.2.10.jar" ]; then
+            sklauncher_path="$location/SKlauncher-3.2.10.jar"
+            break
+        fi
+    done
+    
+    if [ -n "$sklauncher_path" ]; then
+        log "SKLauncher found at: $sklauncher_path"
+        open -R "$sklauncher_path"  # Open in Finder
+        return 0
+    else
+        log "Error: SKLauncher-3.2.10.jar not found in common locations, Please Move SKlauncher to a common location, eg.: $HOME/Downloads"
+        return 1
+    fi
+}
+
+# Generate recommended Video Settings for Minecraft based on system specs
+generate_settings() {
+    echo
+    log "Generating recommended Video Settings for Minecraft..."
+    echo "This is an experimental feature but might increase or decrease performance"
+    echo "============================================"
+
+    local settings=""
+    # Base low-end settings
+    local base_settings="Graphics: Fast, Biome Blend: OFF, VSync: ON, Clouds: OFF, Entity Shadows: OFF, Minimap Levels: OFF, Menu Background Blur: OFF, Smooth Lighting: OFF, Particles: Minimal, Render Distance: 8, Simulation Distance: 8"
+
+    if [[ "$ARCH" == "arm64" ]]; then
+        if [[ "$GPU" == *"Apple"* ]]; then
+            if [[ "$GPU" == *"M1"* ]]; then
+                settings="Graphics: Fast, Biome Blend: OFF, VSync: ON, Clouds: Fast, Entity Shadows: OFF, Menu Background Blur: OFF, Smooth Lighting: ON, Particles: Minimal, Render Distance: 16-12, Simulation Distance: 12-8, Fog: ON"
+            elif [[ "$GPU" == *"M2"* ]]; then
+                settings="Graphics: Fancy, Biome Blend: 5x5, VSync: ON, Clouds: Fast, Entity Shadows: ON, Menu Background Blur: OFF, Smooth Lighting: ON, Particles: Decreased, Render Distance: 20-16, Simulation Distance: 16-12, Fog: ON"
+            elif [[ "$GPU" == *"M3"* ]]; then
+                settings="Graphics: Fancy, Biome Blend: 7x7, VSync: ON, Clouds: Fancy, Entity Shadows: ON, Menu Background Blur: ON, Smooth Lighting: ON, Particles: All/Decresead, Render Distance: 24-20, Simulation Distance: 20-16, Fog: ON"
+            elif [[ "$GPU" == *"M4"* ]]; then
+                settings="Graphics: Fancy, Biome Blend: 9x9, VSync: ON, Clouds: Fancy, Entity Shadows: ON, Menu Background Blur: ON, Smooth Lighting: Maximum, Particles: All, Render Distance: 32-24, Simulation Distance: 32-20, Fog: ON"
+            else
+                settings="$base_settings"
+            fi
+        fi
+    elif [[ "$ARCH" == "x86_64" ]]; then
+        if [[ "$GPU" == *"Intel"* ]]; then
+            settings="$base_settings"
+        elif [[ "$GPU" == *"NVIDIA"* || "$GPU" == *"AMD"* ]]; then
+            if (( RAM >= 32 )); then
+                settings="Graphics: Fancy, Biome Blend: 7x7, VSync: ON, Clouds: Fancy, Entity Shadows: ON, Menu Background Blur: ON, Smooth Lighting: Maximum, Particles: All, Render Distance: 24, Simulation Distance: 20, Fog: ON"
+            elif (( RAM >= 16 )); then
+                settings="Graphics: Fancy, Biome Blend: 5x5, VSync: ON, Clouds: Fast, Entity Shadows: ON, Menu Background Blur: OFF, Smooth Lighting: Maximum, Particles: All, Render Distance: 16, Simulation Distance: 12, Fog: ON"
+            else
+                settings="$base_settings"
+            fi
+        else
+            settings="$base_settings"
+        fi
+    else
+        settings="$base_settings"
+    fi
+
+    echo "=== Recommended Video Settings ==="
+    echo "$settings"
+    echo "============================================"
+}
+
+
+# Generate JVM arguments based on system specs
+generate_jvm_arguments() {
+    printf "\n\n"
+    log "Generating JVM arguments for Minecraft..."
+    echo "============================================"
+
+    local min_ram                               # Local min_ram
+    local max_ram                               # Local max_ram
+
+    if (( RAM < 16 )); then
+        min_ram=$((RAM / 4))                    # 25% of total RAM
+        max_ram=$((RAM / 2))                    # 50% of total RAM
+    elif (( RAM >= 16 && RAM <= 32 )); then
+        min_ram=8                               # Start with 8GB for larger systems
+        max_ram=$((RAM * 3 / 4))                # 75% of total RAM
+        (( max_ram > 16 )) && max_ram=16        # Cap at 16GB
+    else
+        min_ram=8
+        max_ram=24                              # Cap high-RAM systems at 24GB
+    fi
+
+    (( min_ram < 1 )) && min_ram=1              # Ensure at least 1GB minimum
+    
+    # Set ParallelGCThreads based on core count
+    local gc_threads=$((CORES > 4 ? 4 : CORES)) # Use up to 4 threads for GC
+
+    # Generate JVM arguments
+    local jvm_args="-Xms${min_ram}G -Xmx${max_ram}G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC \
+-XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 \
+-XX:ParallelGCThreads=${gc_threads} -Dsun.rmi.dgc.server.gcInterval=2147483646"
+
+    # Output JVM arguments
+    echo
+    echo "=== JVM Recommended Arguments ==="
+    echo "$jvm_args"
+    echo "============================================"
+}
 
 
 
-# -------------------------------
-# Final message
-# -------------------------------
+# -----------------------------
+# Main Execution
+# -----------------------------
 
-# Print message to console letting user know that performance optimizations have been applied
-echo "Performance optimizations applied to run Minecraft using SKLauncher.."
+# Main function to execute all optimizations
+main() {
+    # Parse command line arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --skip-jvm)
+                SKIP_JVM_ARGS=true
+                shift
+                ;;
+            --skip-settings)
+                SKIP_SETTINGS=true
+                shift
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+
+    log "Starting SKLauncher performance optimization..."
+    
+    cleanup_background_processes
+    clear_system_caches
+    optimize_system_settings
+    find_sklauncher
+    
+    if [ "$SKIP_SETTINGS" = false ]; then
+        generate_settings
+    fi
+    
+    if [ "$SKIP_JVM_ARGS" = false ]; then
+        generate_jvm_arguments
+    fi
+    
+    printf "\n"
+    log "Performance optimizations completed successfully"
+    
+    printf "\n"
+    echo "You can Now close this terminal window"
+}
+
+# Execute main function
+main "$@"
