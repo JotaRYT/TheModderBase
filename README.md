@@ -49,6 +49,10 @@ If the problem persists, it's possible that a specific command within the script
 
 **A:** Absolutely! You're welcome to use these scripts in your app. If you modify or publish your app online, please give proper credit to ensure recognition of the original work.
 
+### Q: Does any of those terminal shell scripts collects data?
+
+**A:** No, you're welcome to use these scripts without being tracked and without getting information collected and sent to a server. If you have a lot of concerns, you can check the source-code so yeah, if you don't trust, I can't really do anything.
+
 ## Getting Started
 
 Explore the repository and try out the scripts to see how they can optimize your system. If you encounter any issues or have suggestions, feel free to open an issue or contribute to the project!
